@@ -1,0 +1,1 @@
+{"name":"ctlm-fit-lab","version":"1.0.0","private":true,"description":"Offline-capable Keithley CTLM contact resistivity fitting tool","scripts":{"test":"node tests/test-engine.cjs"}}

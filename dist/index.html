@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Keithley Excel I–V 데이터에서 CTLM 접촉 비저항을 추출하는 브라우저 분석 도구. 베셀 원식 피팅과 원형 보정법 비교.">
+  <title>CTLM Fit Lab · 접촉 비저항 분석</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="vendor/xlsx.full.min.js"></script>
+  <script defer src="engine.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="CTLM Fit Lab 홈"><span class="brand-mark"><span></span></span><strong>CTLM<span>Fit Lab</span></strong></a>
+    <div class="top-right"><span class="local"><i></i> 브라우저 내 계산</span><a href="#method">계산 원리 <span aria-hidden="true">↗</span></a></div>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div><div class="eyebrow">CIRCULAR TRANSMISSION LINE METHOD</div><h1>측정 데이터에서,<br class="mobile-only"> 접촉 비저항까지.</h1><p>Keithley 엑셀을 불러오고 패턴 치수를 확인하세요. I–V 피팅과 CTLM 분석을 한 번에 수행합니다.</p></div>
+      <div class="intro-actions"><button id="demo-btn" class="button secondary" type="button">예제 데이터</button><button id="export-btn" class="button" type="button" disabled><span aria-hidden="true">↓</span> 결과 Excel</button></div>
+    </section>
+    <div class="steps" aria-label="분석 순서"><span><b>01</b> 파일 불러오기</span><i></i><span><b>02</b> 패턴 치수 확인</span><i></i><span><b>03</b> 피팅 결과 확인</span></div>
+    <div class="workspace">
+      <aside class="sidebar">
+        <section class="panel upload-panel">
+          <div class="section-heading"><h2>측정 파일</h2><span class="small-label">INPUT</span></div>
+          <label class="dropzone" id="dropzone" for="file-input">
+            <span class="upload-icon" aria-hidden="true">↥</span><strong>엑셀 파일을 놓아주세요</strong><span>또는 클릭하여 파일 선택</span><small>.xlsx · .xls · .csv / 최대 30 MB</small>
+            <input type="file" id="file-input" accept=".xlsx,.xls,.csv" aria-label="측정 엑셀 파일 선택">
+          </label>
+          <div id="file-state" class="file-state" aria-live="polite"><span class="file-dot"></span><div><strong id="file-name">파일을 선택하세요</strong><span id="file-detail">파일은 서버로 전송되지 않습니다.</span></div></div>
+          <p class="helper">Data·Append 시트의 I1, V2, V3, VPROBE 열을 자동으로 찾습니다.</p>
+        </section>
+        <section class="panel settings-panel">
+          <div class="section-heading"><h2>패턴 &amp; 피팅 설정</h2><span class="small-label">SETUP</span></div>
+          <div class="geometry" aria-label="안쪽 원형 전극 반지름 r0와 전극 사이 간격 s">
+            <svg viewBox="0 0 292 144" role="img"><title>CTLM 전극의 평면도</title><circle cx="112" cy="71" r="58" fill="none" stroke="currentColor" stroke-width="15" opacity=".14"/><circle cx="112" cy="71" r="35" fill="currentColor" opacity=".18"/><circle cx="112" cy="71" r="35" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M112 71h35M148 71h14M112 18h99M112 105h99" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="112" cy="71" r="2" fill="currentColor"/><text x="119" y="64">r₀</text><text x="151" y="64">s</text><text x="218" y="23">바깥 전극</text><text x="218" y="110">안쪽 전극</text></svg>
+          </div>
+          <label class="field-label" for="radius">안쪽 전극 반지름 r₀</label><div class="input-unit"><input id="radius" type="number" value="80" min="0" step="any" inputmode="decimal"><span>μm</span></div>
+          <p class="helper">지름이 아닌 반지름입니다. 기본값 80 μm는 기존 실험 기준입니다.</p>
+          <label class="field-label" for="weighting">CTLM 피팅 가중치</label><select id="weighting"><option value="equal">동일 가중치 · 기본</option><option value="ivse">I–V 저항 표준오차 기반</option></select>
+          <details class="advanced"><summary>단위 &amp; I–V 구간</summary>
+            <div class="two-fields"><div><label for="current-unit">원본 전류 단위</label><select id="current-unit"><option value="1">A</option><option value="0.001">mA</option><option value="0.000001">μA</option><option value="0.000000001">nA</option></select></div><div><label for="voltage-unit">원본 전압 단위</label><select id="voltage-unit"><option value="1">V</option><option value="0.001">mV</option><option value="0.000001">μV</option></select></div></div>
+            <label for="max-voltage">I–V 피팅의 최대 |센스 전압|</label><div class="input-unit"><input id="max-voltage" type="number" min="0" step="any" placeholder="전체 측정점 사용"><span>mV</span></div>
+            <p class="helper">빈칸이면 전체 구간. 전압 차의 절댓값으로 구간만 선택하며, 데이터 자체를 절댓값으로 바꾸지 않습니다.</p>
+          </details>
+          <button class="button full" id="fit-btn" type="button">피팅 실행 <span aria-hidden="true">→</span></button>
+          <p class="privacy"><span aria-hidden="true">○</span> 파일 읽기와 계산이 이 기기 안에서 실행됩니다.</p>
+        </section>
+      </aside>
+      <div class="analysis">
+        <div id="notice" class="notice" role="status" hidden></div>
+        <section class="results-block" aria-labelledby="result-heading">
+          <div class="result-top"><h2 id="result-heading">분석 결과</h2><span id="result-label" class="status-label">데이터 대기</span></div>
+          <div class="metrics">
+            <article class="metric primary-metric"><div class="metric-label">접촉 비저항 <span>ρc</span></div><div class="metric-value" id="rho-value">—</div><div class="metric-unit">Ω·cm² <span class="method-chip">베셀 원식</span></div><p id="rho-se">패턴별 저항을 피팅하면 표시됩니다.</p></article>
+            <article class="metric"><div class="metric-label">면저항 <span>Rsh</span></div><div class="metric-value" id="rs-value">—</div><div class="metric-unit">Ω/□</div><p id="rs-se">반도체 층의 횡방향 저항</p></article>
+            <article class="metric"><div class="metric-label">전달 길이 <span>LT</span></div><div class="metric-value" id="lt-value">—</div><div class="metric-unit">μm</div><p id="lt-se">접촉에서 전류가 전달되는 길이 척도</p></article>
+          </div>
+        </section>
+        <section class="panel fit-panel">
+          <div class="section-heading"><div><h2>간격에 따른 저항</h2><p class="subheading">실제 측정 저항과 두 CTLM 모델의 피팅을 비교합니다.</p></div><button class="text-button" id="svg-btn" type="button" disabled>SVG 저장 ↗</button></div>
+          <div class="plot-legend"><span><i class="dot"></i>측정 저항</span><span><i class="line exact-line"></i>베셀 원식</span><span><i class="line approx-line"></i>원형 보정 근사</span></div>
+          <div id="ctlm-chart" class="chart" aria-live="polite"><div class="chart-empty">측정 파일을 불러오거나 예제 데이터를 선택하세요.</div></div>
+          <div class="chart-stats"><span>원래 저항 축 R² <strong id="exact-r2">—</strong></span><span>사용 패턴 <strong id="pattern-count">—</strong></span><span>r₀ / LT <strong id="radius-ratio">—</strong></span></div>
+        </section>
+        <section class="panel pattern-panel">
+          <div class="section-heading"><div><h2>패턴별 측정</h2><p class="subheading">각 시트의 간격과 전압 열을 확인하세요. 체크를 해제하면 CTLM 피팅에서 제외됩니다.</p></div><span id="mapping-label" class="small-label">GEOMETRY</span></div>
+          <div class="table-scroll"><table class="pattern-table"><thead><tr><th><span class="sr-only">포함</span></th><th>시트 / 패턴</th><th>간격 <small>μm</small></th><th>전류 열</th><th>센스 전압</th><th>저항 <small>Ω</small></th><th>I–V R²</th><th>점 수</th></tr></thead><tbody id="pattern-body"><tr><td colspan="8" class="empty-cell">파일을 불러오면 측정 시트가 표시됩니다.</td></tr></tbody></table></div>
+          <p id="pattern-note" class="table-note">기본 간격 매핑: Data 60 / Append1 40 / Append2 20 / Append3 15 / Append4 10 / Append5 5 μm</p>
+        </section>
+        <div class="bottom-grid">
+          <section class="panel iv-panel"><div class="section-heading"><h2>I–V 피팅</h2><select id="iv-select" aria-label="I–V 그래프로 볼 패턴" disabled><option>패턴 선택</option></select></div><div class="plot-legend"><span><i class="dot"></i>측정값</span><span><i class="line exact-line"></i>자유 절편 직선</span></div><div id="iv-chart" class="chart small-chart"><div class="chart-empty">패턴을 선택하면 I–V 그래프가 표시됩니다.</div></div><p class="table-note" id="iv-note">V = aI + b · R = |a| · 절편을 0으로 강제하지 않습니다.</p></section>
+          <section class="panel comparison-panel"><div class="section-heading"><h2>모델 비교</h2><span class="small-label">CROSS-CHECK</span></div><div class="table-scroll"><table class="comparison-table"><thead><tr><th>항목</th><th>베셀 원식</th><th>보정 근사</th></tr></thead><tbody id="compare-body"><tr><td>접촉 비저항</td><td>—</td><td>—</td></tr><tr><td>면저항</td><td>—</td><td>—</td></tr><tr><td>전달 길이</td><td>—</td><td>—</td></tr><tr><td>저항 축 R²</td><td>—</td><td>—</td></tr></tbody></table></div><p class="helper">두 R²는 원래 측정 저항 축에서 계산합니다. 보정 축의 R²와 혼동하지 마세요.</p><div id="quality-notes" class="quality-notes">치수와 피팅 잔차를 함께 확인하세요.</div></section>
+        </div>
+        <section class="panel method-panel" id="method"><details><summary><span>계산 원리와 적용 조건</span><span class="small-label">METHOD &amp; SOURCES</span></summary><div class="method-content"><div><h3>두 번의 피팅</h3><p>각 시트에서 I–V 직선을 피팅해 저항을 구합니다. 그다음 간격별 저항을 CTLM 모델에 맞춰 면저항과 전달 길이를 추출합니다.</p><p class="formula">ρc = Rsh · (LT × 10⁻⁴)²</p><p>LT 단위는 μm, 결과 단위는 Ω·cm²입니다. 접촉 비저항 계산에는 막 두께가 필요하지 않습니다.</p></div><div><h3>베셀 원식</h3><p>반지름 r₀, 간격 s에서 원형 전류 분포를 고려합니다. I₀/I₁, K₀/K₁ 항을 포함한 모델에 양의 Rsh·LT를 피팅합니다.</p><p>금속 저항을 무시하고, 접촉 아래와 간격의 면저항이 같으며, 바깥 전극이 충분히 넓다고 가정합니다. 유한한 바깥 전극 폭은 별도로 모델링하지 않습니다.</p></div><div><h3>원형 보정 근사</h3><p class="formula">c = (r₀/s) ln(1 + s/r₀)<br>R/c = ms + b<br>Rsh = 2πr₀m, LT = b/(2m)</p><p>r₀/LT가 작거나 간격이 크면 근사 오차가 커질 수 있습니다. 베셀 원식과 비교하세요.</p></div><div><h3>불확도와 데이터 사용</h3><p>표시한 ±값은 국소 선형화로 구한 피팅 표준오차(1σ)이며 치수 오차나 모델의 한계를 포함하지 않습니다. 제외한 패턴과 I–V 구간은 결과 파일에 기록됩니다.</p><p>원본 VPROBE의 음의 기울기는 그대로 보존하고 저항에만 기울기 크기를 사용합니다. V1을 선택하면 공급 전압의 영향을 포함할 수 있습니다.</p></div></div><div class="sources"><a href="https://lab.semi.ac.cn/download/0.10022524661886378.pdf" target="_blank" rel="noreferrer">Marlow &amp; Das, 1982 ↗</a><a href="https://github.com/maciejkozubal/cTLM" target="_blank" rel="noreferrer">관련 CTLM 구현 ↗</a><span>수치 엔진은 독립 구현 · SheetJS CE 0.20.3</span></div></details></section>
+      </div>
+    </div>
+    <footer><span>CTLM Fit Lab</span><span>분석값은 모델 가정과 실제 패턴 치수에 의존합니다.</span><button class="text-button" id="json-btn" type="button" disabled>분석 JSON 저장</button></footer>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
